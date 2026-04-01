@@ -1,0 +1,39 @@
+name: SSRN Paper Processor
+
+on:
+  repository_dispatch:
+    types: [ssrn_sync]
+
+jobs:
+  process-paper:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run paper processor
+        env:
+          PAPER_URL: ${{ github.event.client_payload.url }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python process_paper.py
+
+      - name: Commit updated papers.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/papers.json
+          git diff --cached --quiet || git commit -m "📄 Add paper: $(python -c "import json; papers=json.load(open('data/papers.json')); print(papers[-1]['title'][:60])")"
+          git push
